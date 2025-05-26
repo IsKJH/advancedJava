@@ -1,0 +1,148 @@
+JDBC(Java Database Connectivity)
+=> 자바에서 DMBS와 연동하기 위한 기술(java프로그램에서 SQL문을 실행하기 위해서 제공되는 API)
+=> java.sql, javax.sql
+
+<<MySQL 접속을 위해서 사전 작업>>
+1. 드라이버 다운로드
+   - 모든 DMBS의 제조사 홈페이지에서 다운로드
+   
+2. JVM이 라이브러리를 찾을 수 있는 위치에 드라이버를 등록
+    ① 작업 프로젝트 선택
+    ② 프로젝트 선택 후 단축메뉴 - [Build path]-[Configure Build Path] 선택
+    ③ 대화상자의 세 번째 탭인 [Libraries] 탭 선택
+    ④ [classpath] 선택 후 [Add External Jar..] 버튼을 선택 후 라이브러리 파일의 경로를 찾아 드라이버를 등록
+    
+<<자바를 이용한 DB연동 -JDBC>>
+1. 드라이버 로딩
+  - 특정 클래스를 JVM이 인식할 수 있는 메모리에 로딩
+  - java.sql패키지의 라이브러리로 요청하면 드라이버의 클래스들(java.sql 패키지 클래스들의 하위 클래스)이 실행될 것이므로
+    JVM이 자동으로 인식할 수 있어야 한다.
+  - java.lang패키지의 Class라는 클래스의 forName이라는 메소드를 이용해서 MySQL 드라이버의 핵심 클래스를 메모리에 로딩
+  - 핵심 클래스는 어떤 DBMS의 드라이버를 로딩하냐에 따라 달라진다.
+  
+  [문법]
+  Class.forName("메모리에 로딩하고 싶은 DBMS 드라이버의 핵심 클래스명(패키지까지 명시하기)")
+  
+  [MySQL]
+  Class.forName("com.mysql.cj.jdbc.Driver")
+  
+  [오라클]  
+  Class.forName("oracle.jdbc.driver.OracleDriver")
+  
+2. DBMS 서버에 연결
+  - java.sql패키지의 API를 이용
+  - 다른 PC에 설치되어 있는 서버에 접속이 가능
+  - DBMS서버에 연결할 수 있는 기능을 담당하는 자바의 API를 이용해서 연결
+  - DriverManager클래스의 getConnection이라는 메소드를 이용해서 DB서버에 접속
+  public static COnnection getConnection(String url, String user, String password) throws SQLException
+  1) static메소드이므로 클래스 이름으로 엑세스
+  2) throws하고 있는 SQLException을 처리
+  3) 매개변수
+    url : DB서버에 연결하기 위해서 필요한 정보를 담고 있는 문자열(어떤 DBMS를 쓰냐에 따라서 문자열의 형식이 달라짐)
+          이 url을 확인하고 어떤 DBMS인지 판단
+   [MySQL]
+   jdbc:mysql://127.0.0.1:3306/shop?serverTimezone=UTC
+   ----------  --------------- ------ -------------------
+    MySQL에서    DB서버 IP/Port  데이터 베이스명     서버의 타임존
+    사용하는 프로토콜
+    user : 사용자계정(mydb)
+    password : 패스워드(1234)
+  4) 리턴타입
+     java.sql.COnnection을 리턴
+     DriverManager가 getConnection메소드를 통해서 DB서버에 연결하고 연결정보를 Connection객체로 만들어서 리턴
+                                                                  -----------------------
+                                                                   java.sql.Connection의 하위
+                                                                   자바에서 사용하는 표준API는
+                                                                   Connection이지만
+                                                                   실행 시점에 어떤 드라이버가 매핑
+                                                                   됐는지에 따라 달라진다.
+                                                                   다형성
+3. SQL문을 실행할 수 있는 객체를 생성
+   Connection객체의 메소드를 이용해서 SQL문의 실행을 담당하는 객체를 생성
+	   +----------+
+	   | Statement| - 정적 SQL을 실행할 목적(보안에 취약)
+	   +----------+
+	        ^
+	        |
+	+------------------+
+	| PreparedStatement| - 동적 SQL을 실행할 목적(시큐어코딩에 적합한 방식, 캐시 사용)
+	+------------------+
+	        ^
+	        |
+	+------------------+
+	| CallableStatement| - 각 DBMS에 특화된 SQL로 작성된 명령문을 실행
+	+------------------+
+	
+	1) Statement 객체를 활용
+	  - Connection 객체가 갖고 있는 createStatement 메소드를 이용해서 생성
+	  [형식]
+	  Statement stmt = con.createStatement();
+	  => 어떤 DBMS의 드라이버를 로딩 했냐에 따라 다른 Statement 객체를 리턴
+	2) PreparedStatement 객체를 활용
+4. SQL문을 실행
+	1) Statement 객체를 활용
+	① excuteUpdate : insert, update, delete 명령문을 실행
+				     매개변수에 전달된 sql문을 실행
+				     실행 결과로 몇 개의 row에 반영됐는지 리턴
+				     int result = stmt.executeUpdate(sql);
+				        --------
+				          몇 개의 행이 삽입, 수정, 삭제 됐는지 리턴
+	② executeQuery : select문 실행
+	  ResultSet rs = stmt.executeQuery(sql);			          
+	2) PreparedStatement 객체를 활용
+5. 실행결과 처리
+   1) insert, delete, update
+       - 변경한 레코드의 갯수를 리턴하므로 동일한 방법으로 처리
+   2) select
+       - 결과가 2차원 표의 형태로 리턴, 테이블에 저장된 데이터를 자바에서 사용할 수 있도록 만들어진 객체가 ResultSet
+       - ResultSet에 저장된 데이터를 읽기 위해서 ResultSet에서 지원하는 메소드를 이용해서 작업
+       - 현재 레코드를 다음 레코드로 포지션을 이동하면서 읽기
+                   -----------------------
+                       next() 포지션:Cursor
+       - 한 번에 하나의 컬럼만 읽을 수 있다.
+       - 레코드 갯수만큼 반복처리
+       - 한 레코드의 컬럼을 읽기 위해서 ResultSet에서 제공하는 getXXX메소드를 이용해서 작업
+                                                  -------
+                                                  DBMS 컬럼의 타입에 따라 선택
+       [ResultSet메소드]
+       - MySQL컬럼 타입이 char나 varchar ... : getString(1), getString("id")
+                                           -----------   ---------------
+                                           조회된 ResultSet의           컬럼명
+                                           컬럼순서
+       - MySQL의 타입이 int ... : getInt(1), getInt("컬럼명")
+       - MySQL의 타입이 Date ... : getDate(1), getDate("reg_date")                                    
+6. 자원반납
+7. 미션
+   1) Update테스트
+      - InsertTest.java를 UpdateTest.java로 rename하기
+      - sql문만 변경하고 실행하기
+      - sql문
+        정국이의 addr을 부산으로 변경하기
+        
+        소스코드와 실행결과 캡쳐해서 전송
+   2) Delete테스트
+      - DeleteTest.java를 작성
+      - 모두 코드를 직접 구성해서 작업해보기
+      - sql문은
+        id가 test인 레코드를 삭제    
+        
+   3) Login테스트
+      - LoginTest.java 작성
+      - sql문은 id가 bts1이고 패스워드가 1234인 레코드가 있으면 "로그인 성공" 출력하기
+      - 사용자가 없으면 "로그인 실패" 출력
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
